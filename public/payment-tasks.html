@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UnitPay - 支付任务</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
+    <style>
+        /* 添加加载状态样式 */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            font-size: 16px;
+            color: #666;
+        }
+        .tasks-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .task-item {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .task-id {
+            font-weight: bold;
+            color: #333;
+        }
+        .task-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .status-created { background: #e3f2fd; color: #1976d2; }
+        .status-claimed { background: #fff3e0; color: #f57c00; }
+        .status-paid { background: #e8f5e9; color: #388e3c; }
+        .status-confirmed { background: #f3e5f5; color: #7b1fa2; }
+        .status-cancelled { background: #ffebee; color: #d32f2f; }
+        .task-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .detail-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .detail-value {
+            font-size: 14px;
+            color: #333;
+        }
+        .refresh-btn {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .refresh-btn:hover {
+            background: #1565c0;
+        }
+        .no-tasks {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .wallet-section {
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="tasks-container">
+        <div class="task-header">
+            <h1>支付任务</h1>
+            <div class="wallet-section">
+                <button id="connect-wallet" class="refresh-btn">连接钱包</button>
+                <span id="wallet-address" style="display: none;"></span>
+            </div>
+            <button class="refresh-btn" onclick="loadTasks()">刷新</button>
+        </div>
+        <div id="tasksList"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/wallet-connector.js"></script>
+    <script>
+        const socket = io();
+        let walletAddress = '';
+        const walletConnector = new WalletConnector();
+        
+        // 初始化钱包连接器
+        async function initWallet() {
+            try {
+                const isConnected = await walletConnector.checkConnection();
+                if (isConnected) {
+                    walletAddress = walletConnector.getWalletAddress();
+                    updateWalletUI(walletAddress);
+                    loadTasks();
+                }
+            } catch (error) {
+                console.error('初始化钱包失败:', error);
+                showError('初始化钱包失败: ' + error.message);
+            }
+        }
+
+        // 获取钱包地址
+        async function getWalletAddress() {
+            if (!walletAddress) {
+                try {
+                    // 检查是否已经连接了钱包
+                    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                    if (accounts && accounts.length > 0) {
+                        walletAddress = accounts[0];
+                        document.getElementById('wallet-address').textContent = `钱包地址: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
+                        document.getElementById('wallet-address').style.display = 'inline';
+                        document.getElementById('connect-wallet').style.display = 'none';
+                        return true;
+                    } else {
+                        showError('请先连接钱包');
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('获取钱包地址失败:', error);
+                    showError('获取钱包地址失败: ' + error.message);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // 连接钱包
+        async function connectWallet() {
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                walletAddress = accounts[0];
+                document.getElementById('wallet-address').textContent = `钱包地址: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
+                document.getElementById('wallet-address').style.display = 'inline';
+                document.getElementById('connect-wallet').style.display = 'none';
+                loadTasks(); // 连接成功后加载任务
+            } catch (error) {
+                console.error('连接钱包失败:', error);
+                showError('连接钱包失败: ' + error.message);
+            }
+        }
+
+        // 更新钱包UI
+        function updateWalletUI(address) {
+            const connectBtn = document.getElementById('connect-wallet');
+            const walletAddressSpan = document.getElementById('wallet-address');
+            
+            if (address) {
+                connectBtn.style.display = 'none';
+                walletAddressSpan.style.display = 'inline';
+                walletAddressSpan.textContent = `${address.slice(0, 6)}...${address.slice(-4)}`;
+            } else {
+                connectBtn.style.display = 'inline';
+                walletAddressSpan.style.display = 'none';
+            }
+        }
+
+        // 加载任务列表
+        async function loadTasks() {
+            if (!getWalletAddress()) return;
+
+            showLoading();
+            console.log('开始加载任务，钱包地址:', walletAddress);
+            
+            try {
+                const url = `/api/payment-intents/user/${walletAddress}`;
+                console.log('请求URL:', url);
+                
+                const response = await fetch(url);
+                console.log('API响应状态:', response.status);
+                const result = await response.json();
+                console.log('API响应数据:', result);
+                
+                if (result.success) {
+                    console.log('成功获取任务数据，任务数量:', result.data.paymentIntents.length);
+                    displayTasks(result.data);
+                } else {
+                    console.error('加载任务失败:', result.message);
+                    showError(result.message || '加载任务失败');
+                }
+            } catch (error) {
+                console.error('加载任务失败:', error);
+                showError('加载任务失败: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 显示加载状态
+        function showLoading() {
+            const tasksList = document.getElementById('tasksList');
+            tasksList.innerHTML = '<div class="loading">加载中...</div>';
+        }
+
+        // 隐藏加载状态（通过displayTasks或showError函数自动处理）
+        function hideLoading() {
+            // 不需要实现，因为会被其他显示函数覆盖
+        }
+
+        // 显示任务列表
+        function displayTasks(tasks) {
+            console.log('displayTasks接收到的数据:', JSON.stringify(tasks, null, 2));
+            const tasksList = document.getElementById('tasksList');
+            
+            // 确保我们使用正确的数据结构
+            const tasksArray = tasks.paymentIntents || tasks || [];
+            console.log('处理后的任务数组:', tasksArray);
+            
+            if (tasksArray.length === 0) {
+                tasksList.innerHTML = '<div class="no-tasks">暂无支付任务</div>';
+                return;
+            }
+
+            // 添加状态筛选器
+            const filterHtml = `
+                <div class="status-filter" style="margin-bottom: 20px;">
+                    <label>状态筛选：</label>
+                    <select id="statusFilter" onchange="filterTasks()">
+                        <option value="all">全部</option>
+                        <option value="active">进行中</option>
+                        <option value="completed">已完成</option>
+                        <option value="cancelled">已取消</option>
+                    </select>
+                    <span style="margin-left: 10px;">
+                        总计: ${tasksArray.length} 条记录
+                    </span>
+                </div>
+            `;
+
+            // 渲染任务列表
+            tasksList.innerHTML = filterHtml + tasksArray.map(task => {
+                const taskData = typeof task === 'object' ? task : {};
+                console.log('处理任务数据:', taskData);
+                
+                return `
+                    <div class="task-item" data-status="${taskData.status || 'unknown'}">
+                        <div class="task-header">
+                            <span class="task-id">任务ID: ${taskData.id || '未知'}</span>
+                            <span class="task-status status-${(taskData.status || '').toLowerCase()}">${getStatusText(taskData.status)}</span>
+                        </div>
+                        <div class="task-details">
+                            <div class="detail-item">
+                                <span class="detail-label">支付金额</span>
+                                <span class="detail-value">${taskData.amount || 0} ${taskData.currency || 'USD'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">支付平台</span>
+                                <span class="detail-value">${taskData.platform || '未知'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">创建时间</span>
+                                <span class="detail-value">${taskData.createdAt ? new Date(taskData.createdAt).toLocaleString() : '未知'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">过期时间</span>
+                                <span class="detail-value">${taskData.expiresAt ? new Date(taskData.expiresAt).toLocaleString() : '未知'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">商家 PayPal 邮箱</span>
+                                <span class="detail-value">${taskData.merchantPaypalEmail || (taskData.merchantInfo && taskData.merchantInfo.paypalEmail) || '未设置'}</span>
+                            </div>
+                        </div>
+                        ${((taskData.status || '').toLowerCase() === 'expired' || (taskData.expiresAt && new Date(taskData.expiresAt) < new Date())) ? `
+                        <div class="task-action">
+                            <button class="refresh-btn" style="margin-top: 10px;" onclick="handleRefund('${taskData.id}')">取回资金</button>
+                        </div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 添加任务筛选功能
+        function filterTasks() {
+            const filter = document.getElementById('statusFilter').value;
+            const tasks = document.querySelectorAll('.task-item');
+            
+            tasks.forEach(task => {
+                const status = task.getAttribute('data-status');
+                switch(filter) {
+                    case 'active':
+                        task.style.display = ['created', 'claimed', 'paid'].includes(status) ? '' : 'none';
+                        break;
+                    case 'completed':
+                        task.style.display = ['confirmed'].includes(status) ? '' : 'none';
+                        break;
+                    case 'cancelled':
+                        task.style.display = ['cancelled', 'expired'].includes(status) ? '' : 'none';
+                        break;
+                    default:
+                        task.style.display = '';
+                }
+            });
+        }
+
+        // 获取状态文本
+        function getStatusText(status) {
+            const statusMap = {
+                'created': '已创建',
+                'claimed': '已认领',
+                'paid': '已支付',
+                'confirmed': '已确认',
+                'cancelled': '已取消',
+                'expired': '已过期',
+                'pending': '处理中',
+                'failed': '失败'
+            };
+            return statusMap[status] || status || '未知状态';
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const tasksList = document.getElementById('tasksList');
+            tasksList.innerHTML = `<div class="no-tasks">${message}</div>`;
+        }
+
+        // 监听支付状态更新
+        socket.on('paymentStatusUpdate', (data) => {
+            if (data.walletAddress === walletAddress) {
+                loadTasks();
+            }
+        });
+
+        // 设置事件监听
+        document.getElementById('connect-wallet').addEventListener('click', connectWallet);
+        
+        // 页面加载时初始化钱包
+        initWallet();
+
+        // 在此处新增：处理退款按钮点击事件
+        async function handleRefund(paymentIntentId) {
+            if (!confirm('确认取回托管资金？')) return;
+            try {
+                const response = await fetch('/api/refund-escrow', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paymentIntentId })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('退款交易已提交，交易哈希: ' + (result.txHash || ''));
+                    loadTasks();
+                } else {
+                    alert('退款失败: ' + (result.message || result.error || JSON.stringify(result)));
+                }
+            } catch (error) {
+                console.error('退款请求失败:', error);
+                alert('退款请求失败: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html> 

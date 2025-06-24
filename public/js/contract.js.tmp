@@ -1,0 +1,32 @@
+// 检查 USDT 授权额度
+async checkUSDTAllowance(owner, spender) {
+  try {
+    if (!this.isWalletConnected()) {
+      throw new Error('钱包未连接');
+    }
+
+    if (!this.usdtContract) {
+      throw new Error('USDT合约未初始化');
+    }
+
+    // 获取精度
+    const decimals = await this.usdtContract.methods.decimals().call();
+    
+    // 获取授权额度
+    const allowance = await this.usdtContract.methods.allowance(owner, spender).call();
+    
+    // 使用 BigNumber 处理精度
+    const allowanceBN = this.web3.utils.toBN(allowance);
+    const divisor = this.web3.utils.toBN(10).pow(this.web3.utils.toBN(decimals));
+    const beforeDecimal = allowanceBN.div(divisor);
+    const afterDecimal = allowanceBN.mod(divisor);
+    
+    // 格式化授权额度
+    const formattedAllowance = beforeDecimal.toString() + '.' + afterDecimal.toString().padStart(decimals, '0');
+    
+    return parseFloat(formattedAllowance).toFixed(6);
+  } catch (error) {
+    console.error('获取USDT授权额度失败:', error);
+    throw error;
+  }
+} 

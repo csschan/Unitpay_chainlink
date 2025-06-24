@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UnitPay - QR Payment System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/tasks.css">
+</head>
+<body>
+  <div class="container">
+    <header class="py-3 mb-4 border-bottom">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <h1 class="fs-4">UnitPay</h1>
+          <span class="badge bg-primary ms-2">MVP</span>
+        </div>
+        <div class="d-flex">
+          <a href="/index.html" class="nav-link me-3">Home</a>
+          <a href="/paypal-dashboard.html" class="nav-link me-3">PayPal Dashboard</a>
+          <a href="/lp.html" class="nav-link">LP Management</a>
+        </div>
+      </div>
+    </header>
+    
+    <main>
+      <!-- 用户未连接钱包 -->
+      <div id="wallet-connect-section" class="text-center py-5">
+        <h2>Connect Wallet to Get Started</h2>
+        <p class="lead">Connect your Ethereum wallet to use UnitPay for QR code payments</p>
+        <button id="connect-wallet-btn" class="btn btn-primary btn-lg">Connect Wallet</button>
+      </div>
+      
+      <!-- 用户已连接钱包 -->
+      <div id="user-dashboard" class="d-none">
+        <div class="row">
+          <div class="col-md-4">
+            <div class="card mb-4">
+              <div class="card-header">Wallet Info</div>
+              <div class="card-body">
+                <p class="mb-1">Address: <span id="wallet-address" class="text-truncate d-inline-block" style="max-width: 180px;"></span></p>
+                <p class="mb-1">Status: <span class="badge bg-success">Connected</span></p>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                  <p class="mb-0">USDT Balance: <span id="usdt-balance">Loading...</span> USDT</p>
+                  <button id="refresh-balance-btn" class="btn btn-sm btn-outline-primary">Refresh</button>
+                </div>
+                <div class="small text-muted mt-1">Balance used for escrow payments</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-md-8">
+            <div class="card">
+              <div class="card-header">Scan QR Payment</div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <button id="scan-qr-btn" class="btn btn-primary">Scan QR Code</button>
+                  <input type="file" id="qr-file-input" accept="image/*" class="d-none">
+                </div>
+                
+                <div id="payment-form" class="d-none">
+                  <div class="mb-3">
+                    <label for="qr-content" class="form-label">QR Code Content</label>
+                    <input type="text" class="form-control" id="qr-content" readonly>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label for="payment-platform" class="form-label">Payment Platform</label>
+                    <select class="form-control" id="payment-platform" required>
+                      <option value="PayPal">PayPal</option>
+                      <option value="GCash">GCash</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  
+                  <!-- 添加LP选择字段 -->
+                  <div class="mb-3">
+                    <label for="lp-select" class="form-label">Select LP</label>
+                    <select class="form-control" id="lp-select">
+                      <option value="auto">-- Auto-match LP --</option>
+                      <!-- LP选项将动态加载 -->
+                    </select>
+                    <small class="form-text text-muted">Select a specific LP or choose "Auto-match LP" for system allocation based on fee rate</small>
+                    <div class="alert alert-warning mt-2" role="alert">
+                      <strong>Note:</strong> With the current contract version, you must select a specific LP; the "Auto-match LP" option is not available. Please choose an LP from the list.
+                    </div>
+                  </div>
+                  
+                  <!-- 费率设置字段 -->
+                  <div class="mb-3" id="rate-field">
+                    <label for="fee-rate" class="form-label">Desired Fee Rate (%)</label>
+                    <input type="number" id="fee-rate" class="form-control" value="0.5" min="0.1" max="5" step="0.1">
+                    <small class="form-text text-muted">Maximum fee rate percentage you're willing to pay</small>
+                  </div>
+                  
+                  <div class="mb-3" id="paypal-email-field" style="display:none;">
+                    <label for="merchant-paypal-email" class="form-label">Merchant PayPal Email</label>
+                    <input type="email" class="form-control" id="merchant-paypal-email" placeholder="example@example.com">
+                    <small class="form-text text-muted">When paying with PayPal, please provide the recipient's PayPal email</small>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label for="payment-amount" class="form-label">Payment Amount</label>
+                    <input type="number" class="form-control" id="payment-amount" step="0.01" min="0.01" required>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label for="payment-description" class="form-label">Note</label>
+                    <input type="text" class="form-control" id="payment-description">
+                  </div>
+                  
+                  <button id="create-payment-btn" class="btn btn-success">Create Payment</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 支付任务列表 -->
+        <div class="card mt-4">
+          <div class="card-header">My Payment Tasks</div>
+          <div class="card-body">
+            <div id="payment-tasks-list" class="list-group">
+              <!-- 任务列表将通过JS动态加载 -->
+              <div class="text-center py-3" id="no-tasks-message">
+                <p class="text-muted">No payment tasks</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 支付确认模态框 -->
+      <div class="modal fade" id="confirm-payment-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Confirm Service Received</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p>The LP has completed the service; please confirm you have received and are satisfied.</p>
+              <div class="alert alert-info">
+                <small>After confirmation, your escrow funds will be marked as withdrawable; LP can withdraw <span id="confirm-amount"></span> USDT after 24 hours (T+1).</small>
+              </div>
+              <div class="mt-2 alert alert-warning">
+                <small>Note: Confirmation must be initiated from the same wallet that created the order.</small>
+              </div>
+              <div class="mt-3">
+                <p><strong>LP Wallet Address:</strong> <span id="confirm-lp-address" style="word-break: break-all;"></span></p>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary" id="confirm-received-btn">Confirm Received and Release Payment</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    
+    <footer class="py-3 my-4 border-top">
+      <p class="text-center text-muted">© 2023 UnitPay</p>
+    </footer>
+  </div>
+  
+  <!-- 交易状态模态框 -->
+  <div id="transaction-status-modal" class="transaction-modal">
+    <div class="transaction-modal-content">
+      <div class="transaction-header">
+        <h5 class="transaction-title">Transaction Status</h5>
+        <span class="close-transaction">&times;</span>
+      </div>
+      <div class="transaction-body">
+        <!-- 状态显示 -->
+        <div class="transaction-status status-processing">
+          <div id="status-processing" style="display: none;">
+            <div class="transaction-spinner"></div>
+            <p>Transaction Processing...</p>
+          </div>
+          <div id="status-success" style="display: none;">
+            <div class="status-icon">✓</div>
+            <p>Transaction Successful</p>
+          </div>
+          <div id="status-error" style="display: none;">
+            <div class="status-icon">✗</div>
+            <p>Transaction Failed</p>
+          </div>
+        </div>
+        
+        <!-- 交易详情 -->
+        <div class="transaction-details">
+          <div class="detail-item">
+            <span class="detail-label">LP Recipient Address:</span>
+            <span class="detail-value" id="tx-lp-address"></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Payment Amount:</span>
+            <span class="detail-value" id="tx-amount"></span>
+          </div>
+          <div class="detail-item" id="tx-hash-container" style="display: none;">
+            <span class="detail-label">Transaction Hash:</span>
+            <span class="detail-value" id="tx-hash"></span>
+          </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="transaction-actions">
+          <a href="#" class="btn-explorer" id="view-explorer-btn" target="_blank" style="display: none;">View on Explorer</a>
+          <button class="btn-close-transaction" id="close-transaction-btn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 脚本 -->
+  <!-- 第三方库 -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.6.1/dist/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <!-- 自定义样式 -->
+  <link rel="stylesheet" href="/css/transaction-modal.css">
+
+  <!-- 自定义脚本（按依赖顺序） -->
+  <script src="/js/config.js"></script>
+  <script src="/js/unitpayEnhancedAbi.js"></script>
+  <!-- 添加ethers.js -->
+  <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+
+  <!-- 加载其他JS文件 -->
+  <script src="/js/contract.js"></script>
+  <script src="/js/wallet-connector.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

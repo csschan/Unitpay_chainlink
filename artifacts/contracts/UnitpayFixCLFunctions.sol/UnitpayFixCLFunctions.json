@@ -1,0 +1,81 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "UnitpayFixCLFunctions",
+  "sourceName": "contracts/UnitpayFixCLFunctions.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "getFunctionsRouter",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getSubscriptionId",
+      "outputs": [
+        {
+          "internalType": "uint64",
+          "name": "",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_functionsRouter",
+          "type": "address"
+        }
+      ],
+      "name": "updateFunctionsRouter",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_source",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_secrets",
+          "type": "bytes32"
+        }
+      ],
+      "name": "updateSourceAndSecrets",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "_subscriptionId",
+          "type": "uint64"
+        }
+      ],
+      "name": "updateSubscriptionId",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

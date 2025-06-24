@@ -1,0 +1,17 @@
+{
+  "network": "sepolia",
+  "unitpayAddress": "0x25C7b46fFE961477d014a822c72B81Fc503f9Ef8",
+  "defaultToken": "0x25c59d52b47739b21379090a4cbb05738dd8fb60",
+  "functionsRouter": "0xb83E47C2bC239B3bf370bc41e1459A34b41238D0",
+  "sourceHash": "0xace161c72a6e9ba370adc7dfb5815482ace8d33cc59b22a241351454afa19bde",
+  "secretsHash": "0x24594d77539319409d52f518c905a237b81dccd6e3f9b9f095f919ada0b7cb8b",
+  "subscriptionId": "4842",
+  "timestamp": "2025-06-03T03:59:18.742Z",
+  "deployer": "0x8A620a56A249aE03b41012897B3B1c61367CAF2c",
+  "unitpayEnhanced": "0x25C7b46fFE961477d014a822c72B81Fc503f9Ef8",
+  "source": "0x6aafb4a5ebbd01f02fee4ec707678fe77cb9611be21fb78f065699c42812efda",
+  "secrets": "0x2110c481456f6791a4b8e780097634e375c92abc1892fe71e0c6c6093231c5cd",
+  "donId": "0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000",
+  "deploymentTimestamp": 1749633289584,
+  "testFunctionsAddress": "0xd8B5FB9Db4A45Ef030a453638cB020Aa334ce1c1"
+}

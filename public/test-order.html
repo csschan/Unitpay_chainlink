@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单功能测试</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .order-status {
+            min-width: 80px;
+            text-align: center;
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h2>订单列表测试</h2>
+        
+        <!-- 测试按钮 -->
+        <div class="mb-4">
+            <button class="btn btn-primary" onclick="addTestOrder('pending')">添加待处理订单</button>
+            <button class="btn btn-info" onclick="addTestOrder('processing')">添加处理中订单</button>
+            <button class="btn btn-success" onclick="addTestOrder('completed')">添加已完成订单</button>
+            <button class="btn btn-danger" onclick="addTestOrder('failed')">添加失败订单</button>
+        </div>
+
+        <!-- 订单列表 -->
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>订单ID</th>
+                        <th>创建时间</th>
+                        <th>金额</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="orderList">
+                    <!-- 测试订单将被动态添加到这里 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Toast容器 -->
+    <div class="toast-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/order.js"></script>
+    <script>
+        // 生成测试订单ID
+        function generateTestOrderId() {
+            return 'TEST_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // 添加测试订单
+        function addTestOrder(status) {
+            const orderId = generateTestOrderId();
+            const orderHtml = `
+                <tr data-order-id="${orderId}">
+                    <td>${orderId}</td>
+                    <td>${new Date().toLocaleString()}</td>
+                    <td>100 USDT</td>
+                    <td><span class="order-status badge ${getStatusClass(status)}">${getStatusText(status)}</span></td>
+                    <td class="order-actions">
+                        <!-- 操作按钮将由updateActionButtons函数动态添加 -->
+                    </td>
+                </tr>
+            `;
+            
+            document.getElementById('orderList').insertAdjacentHTML('afterbegin', orderHtml);
+            const actionButtons = document.querySelector(`[data-order-id="${orderId}"] .order-actions`);
+            updateActionButtons(actionButtons, status);
+
+            // 如果订单状态是pending或processing，添加到监控列表
+            if (['pending', 'processing'].includes(status)) {
+                orderStatusMonitor.addOrder(orderId);
+            }
+        }
+
+        // 显示Toast消息
+        function showToast(type, message) {
+            const toastHtml = `
+                <div class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header">
+                        <strong class="me-auto">${type === 'success' ? '成功' : '错误'}</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            const toastContainer = document.querySelector('.toast-container');
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            
+            const toastElement = toastContainer.lastElementChild;
+            const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 3000 });
+            toast.show();
+            
+            // 监听隐藏事件，移除DOM元素
+            toastElement.addEventListener('hidden.bs.toast', () => {
+                toastElement.remove();
+            });
+        }
+
+        // 模拟API响应
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options) {
+            if (url.includes('/api/orders/')) {
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        const orderId = url.split('/')[3];
+                        if (url.includes('/status')) {
+                            // 模拟状态更新
+                            resolve({
+                                ok: true,
+                                json: () => Promise.resolve({
+                                    success: true,
+                                    data: {
+                                        status: Math.random() > 0.7 ? 'completed' : 'processing'
+                                    }
+                                })
+                            });
+                        } else if (url.includes('/cancel')) {
+                            // 模拟取消订单
+                            resolve({
+                                ok: true,
+                                json: () => Promise.resolve({
+                                    success: true
+                                })
+                            });
+                        } else if (options?.method === 'DELETE') {
+                            // 模拟删除订单
+                            resolve({
+                                ok: true,
+                                json: () => Promise.resolve({
+                                    success: true
+                                })
+                            });
+                        } else {
+                            // 模拟获取订单详情
+                            resolve({
+                                ok: true,
+                                json: () => Promise.resolve({
+                                    success: true,
+                                    data: {
+                                        id: orderId,
+                                        createdAt: new Date().toISOString(),
+                                        amount: '100',
+                                        lpAddress: '0x1234...5678',
+                                        status: 'processing',
+                                        txHash: '0xabcd...ef01'
+                                    }
+                                })
+                            });
+                        }
+                    }, 500); // 添加500ms延迟模拟网络请求
+                });
+            }
+            return originalFetch(url, options);
+        };
+    </script>
+</body>
+</html> 
